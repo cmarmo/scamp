@@ -45,14 +45,14 @@
 /*
  * Store crossid calculus states
  */
-struct cross_state {
+typedef struct cross_state {
     double lngmin;
     double lngmax;
     double latmin;
     double latmax;
     double projmin[NAXIS];
     double projmax[NAXIS];
-};
+} CrossState;
 
 /* 
  * Compute the largest possible error in pixels allowed in previous matching 
@@ -103,19 +103,19 @@ __sort_samples(fgroupstruct *fgroup)
 }
 
 int
-__cross_samples(setstruct          *set_a, 
-                setstruct          *set_b,
-                int                 lng, 
-                int                 lat, 
-                int                 naxis,
-                double              limit,
-                struct cross_state *state)
+__cross_samples(setstruct   *set_a, 
+                setstruct   *set_b,
+                int         lng, 
+                int         lat, 
+                int         naxis,
+                double      limit,
+                CrossState *state)
 {
     int i, j;
     int yaxis;
     double lngX, latX; 
     double *proj;
-    samplestruct sample;
+    samplestruct sample, sample_reached;;
 
     for (i=0; i < set_a->nsample; i++) {
         sample = set_a->sample[i];
@@ -143,9 +143,27 @@ __cross_samples(setstruct          *set_a,
 
             latX = (naxis<2) ? proj[yaxis=0] : proj[yaxis=1];
 
-        }
+            /* 
+             * ?????????????
+             *
+             * for (nsamp2=nsamp2b; nsamp2-- && samp2->projpos[yaxis] < latmin1; samp2++); 
+             *
+             * TODO not sure, test
+             *
+             * Should mean this:
+             */
+            sample_reached = set_b->sample[0];
+            for (j=0; j < set_b->nsample; j++) {
+                if (set_b->sample[j].projpos[yaxis] < (latX - limit)) {
+                    sample_reached = set_b->sample[j];
+                } else {
+                    break;
+                }
+            }
 
-        
+            
+            
+        }
     }
 }
 
@@ -154,38 +172,82 @@ __cross_samples(setstruct          *set_a,
  * Returns 1 if it overlaps, -1 if not.
  */
 int
-__cross_overlaps(setstruct          *set_a, 
-                 setstruct          *set_b,
-                 int                 lng, 
-                 int                 lat, 
-                 int                 naxis,
-                 double              limit,
-                 struct cross_state *state)
+__cross_overlaps(setstruct  *set_a, 
+                 setstruct  *set_b,
+                 int         lng, 
+                 int         lat, 
+                 int         naxis,
+                 double      limit,
+                 CrossState *state)
 {
+
+    /* This is the old function */
+    /*
+    if (lng != lat)
+    {   
+        if (
+                set1->projposmin[lng] > (lngmax2=set2->projposmax[lng] + rlimit) ||
+                (lngmin2=set2->projposmin[lng] - rlimit) > set1->projposmax[lng] ||
+                set1->projposmin[lat] > (latmax2=set2->projposmax[lat] + rlimit) ||
+                (latmin2=set2->projposmin[lat] - rlimit)> set1->projposmax[lat]) 
+        {   
+            continue;
+        }   
+    }   
+    else 
+    {   
+        for (i=0; i<naxis; i++) {
+            if (
+                    set1->projposmin[i] > (projmax2[i]=set2->projposmax[i]+rlimit) ||
+                    (projmin2[i]=set2->projposmin[i]-rlimit)> set1->projposmax[i]) 
+            {   
+                continue;
+            }   
+        }   
+    }   
+    */
+
     int i;
 
+    /* Wich should look like this. 
+     * Is this realy what we want? 
+     */
     if (lng != lat) {
-
-        if ( set_a->projposmin[lng] > (state->lngmax = set_b->projposmax[lng] + limit) ||
-            (state->lngmin = set_b->projposmin[lng] - limit) > set_a->projposmax[lng]  ||
-             set_a->projposmin[lat] > (state->latmax = set_b->projposmax[lat] + limit) ||
-            (state->latmin = set_b->projposmin[lat] - limit)> set_a->projposmax[lat]) {
+        
+        state->lngmax = set_b->projposmax[lng] + limit;
+        if (set_a->projposmin[lng] > state->lngmax)
             return -1;
-        }
+
+        state->lngmin = set_b->projposmin[lng] - limit;
+        if (state->lngmin > set_a->projposmax[lng])
+            return -1;
+
+        state->latmax = set_b->projposmax[lat] + limit;
+        if (set_a->projposmin[lat] > state->latmax)
+            return -1;
+
+        state->latmin = set_b->projposmin[lat] - limit;
+        if (state->latmin > set_a->projposmax[lat])
+            return -1;
 
     } else {
 
         for (i=0; i<naxis; i++) {
-            if ( set_a->projposmin[i] > (state->projmax[i]=set_b->projposmax[i]+limit) ||
-                (state->projmin[i] = set_b->projposmin[i]-limit)> set_a->projposmax[i]) 
-            {   
+
+            state->projmax[i] = set_b->projposmax[i] + limit;
+            if (set_a->projposmin[i] > state->projmax[i])
                 return -1;
-            }   
+
+            state->projmin[i] = set_b->projmosmin[i] - limit;
+            if (state->projmin[ï] > set_a->projposmax[ï])
+                return -1;
+
         }   
     }
 
     return 1;
 }
+
 
 /*
  * Crossid algorythm.
@@ -200,7 +262,7 @@ __cross_set(setstruct *set_a,
             int        lat)
 {
     int status;
-    struct cross_state state;
+    CrossState state;
     state.lngmin = 0.0;
     state.lngmax = 0.0;
     state.latmin = 0.0;
