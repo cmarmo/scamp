@@ -65,6 +65,7 @@ __get_limit(fgroupstruct *fgroup,
     double lim_result = 0.0;
     int i;
 
+    printf("get limit!\n");
     for (i=0; i < fgroup->naxis; i++) {
         lim_tmp = tolerance / fgroup->meanwcsscale[i];
         if (lim_tmp > lim_result)
@@ -101,18 +102,65 @@ __sort_samples(fgroupstruct *fgroup)
     }
 }
 
+int
+__cross_samples(setstruct          *set_a, 
+                setstruct          *set_b,
+                int                 lng, 
+                int                 lat, 
+                int                 naxis,
+                double              limit,
+                struct cross_state *state)
+{
+    int i, j;
+    int yaxis;
+    double lngX, latX; 
+    double *proj;
+    samplestruct sample;
+
+    for (i=0; i < set_a->nsample; i++) {
+        sample = set_a->sample[i];
+        if (lat != lng) {
+
+            lngX  = sample.projpos[lng];
+            latX  = sample.projpos[lat];
+            yaxis = lat;
+
+            if (latX < state->latmin || 
+                latX > state->latmax || 
+                lngX < state->lngmin || 
+                lngX > state->lngmax)
+                continue; 
+
+        } else {
+
+            proj = sample.projpos;
+
+            for (j=0; j<naxis; j++) {
+                if (proj[j] < state->projmin[j] || 
+                    proj[i] > state->projmax[j])
+                    continue;
+            }
+
+            latX = (naxis<2) ? proj[yaxis=0] : proj[yaxis=1];
+
+        }
+
+        
+    }
+}
+
 /*
  * Exclude non overlapping frames.
  * Returns 1 if it overlaps, -1 if not.
  */
 int
-__cross_overlaps(setstruct *set_a, 
-                setstruct *set_b,
-                int        lng, 
-                int        lat, 
-                int        naxis,
-                double     limit,
-                struct cross_state *state)
+__cross_overlaps(setstruct          *set_a, 
+                 setstruct          *set_b,
+                 int                 lng, 
+                 int                 lat, 
+                 int                 naxis,
+                 double              limit,
+                 struct cross_state *state)
 {
     int i;
 
@@ -162,7 +210,10 @@ __cross_set(setstruct *set_a,
     if (status < 0)
         return;
     
-    // STOP HERE, restart at "for(nsamp-set1->nsample;nsam--;samp1++..."
+    status = __cross_samples(set_a, set_b, lng, lat, naxis, limit, &state);
+    if (status < 0)
+        return;
+
 }
 
 /*
@@ -248,7 +299,7 @@ void crossid_fgroup(fgroupstruct *fgroup,
      * Now start the real cross-id loop 
      */
 
-    __loop_crossid(fgroup, rlimit);
+    //__loop_crossid(fgroup, rlimit);
 
     /* Foreach fealds */
     for (f1=1; f1<nfield; f1++)
