@@ -42,6 +42,17 @@
 #include "config.h"
 #endif
 
+/*
+ * Store crossid calculus states
+ */
+struct cross_state {
+    double lngmin;
+    double lngmax;
+    double latmin;
+    double latmax;
+    double projmin[NAXIS];
+    double projmax[NAXIS];
+};
 
 /* 
  * Compute the largest possible error in pixels allowed in previous matching 
@@ -100,24 +111,25 @@ __cross_overlaps(setstruct *set_a,
                 int        lng, 
                 int        lat, 
                 int        naxis,
-                double     *lngmax)
+                double     limit,
+                struct cross_state *state)
 {
     int i;
 
     if (lng != lat) {
 
-        if ( set1->projposmin[lng] > (*lngmax=set2->projposmax[lng] + rlimit) ||
-            (lngmin2=set2->projposmin[lng] - rlimit) > set1->projposmax[lng]  ||
-             set1->projposmin[lat] > (latmax2=set2->projposmax[lat] + rlimit) ||
-            (latmin2=set2->projposmin[lat] - rlimit)> set1->projposmax[lat]) {
+        if ( set_a->projposmin[lng] > (state->lngmax = set_b->projposmax[lng] + limit) ||
+            (state->lngmin = set_b->projposmin[lng] - limit) > set_a->projposmax[lng]  ||
+             set_a->projposmin[lat] > (state->latmax = set_b->projposmax[lat] + limit) ||
+            (state->latmin = set_b->projposmin[lat] - limit)> set_a->projposmax[lat]) {
             return -1;
         }
 
     } else {
 
         for (i=0; i<naxis; i++) {
-            if ( set1->projposmin[i] > (projmax2[i]=set2->projposmax[i]+rlimit) ||
-                (projmin2[i]=set2->projposmin[i]-rlimit)> set1->projposmax[i]) 
+            if ( set_a->projposmin[i] > (state->projmax[i]=set_b->projposmax[i]+limit) ||
+                (state->projmin[i] = set_b->projposmin[i]-limit)> set_a->projposmax[i]) 
             {   
                 return -1;
             }   
@@ -139,8 +151,15 @@ __cross_set(setstruct *set_a,
             int        lng,
             int        lat)
 {
-    double lngmax = 0.0;
-    if (__cross_overlaps(set_a, set_b, lng, lat, naxis, &lngmax) < 0)
+    int status;
+    struct cross_state state;
+    state.lngmin = 0.0;
+    state.lngmax = 0.0;
+    state.latmin = 0.0;
+    state.latmax = 0.0;
+
+    status = __cross_overlaps(set_a, set_b, lng, lat, naxis, limit, &state);
+    if (status < 0)
         return;
     
     // STOP HERE, restart at "for(nsamp-set1->nsample;nsam--;samp1++..."
