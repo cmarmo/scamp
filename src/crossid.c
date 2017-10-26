@@ -3,8 +3,6 @@
  *
  * Manage source cross-identifications.
  *
- *%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
- *
  * This file part of: SCAMP
  *
  * Copyright:  (C) 2002-2012 Emmanuel Bertin -- IAP/CNRS/UPMC
@@ -24,16 +22,7 @@
  *
  * Last modified:  13/09/2012
  *
- *%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
-
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
-
-#include <math.h>
-#include <stdio.h>
-#include <stdlib.h>
-
+ */
 #include "define.h"
 #include "globals.h"
 #include "crossid.h"
@@ -45,25 +34,170 @@
 #include "misc.h"
 #include "prefs.h"
 #include "samples.h"
+#include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
 
-/****** crossid_fgroup *******************************************************
-  PROTO void crossid_fgroup(fgroupstruct *fgroup, fieldstruct *reffield,
-  double tolerance)
-  PURPOSE Perform source cross-identifications in a group of fields.
-  INPUT ptr to the group of fields,
-  ptr to the reference field,
-  Tolerance (in deg. if angular coordinates).
-  OUTPUT -.
-  NOTES Uses the global preferences.
-  AUTHOR E. Bertin (IAP)
-  VERSION 13/09/2012
- ***/
-void crossid_fgroup(
-    fgroupstruct *fgroup, 
-    fieldstruct  *reffield,
-    double        tolerance)
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
+
+/* 
+ * Compute the largest possible error in pixels allowed in previous matching 
+ */
+double 
+__get_limit(fgroupstruct *fgroup, 
+            double        tolerance) 
 {
+    double lim_tmp;
+    double lim_result = 0.0;
+    int i;
 
+    for (i=0; i < fgroup->naxis; i++) {
+        lim_tmp = tolerance / fgroup->meanwcsscale[i];
+        if (lim_tmp > lim_result)
+            lim_result = lim_tmp;
+    }
+
+    return lim_result;
+}
+
+
+/* 
+ * Sort samples to accelerate further processing and reset pointers 
+ */
+void 
+__sort_samples(fgroupstruct *fgroup) 
+{
+    fieldstruct **field = fgroup->field;
+    setstruct    *set;
+    int i, j;
+
+    for (i=0; i < fgroup->nfield; i++) {
+
+        field[i]->prevfield = NULL;
+        field[i]->nextfield = NULL;
+
+        for (j=0; j < field[i]->nset; j++) {
+
+            set = field[i]->set[j];
+
+            sort_samples(set);
+            unlink_samples(set);
+
+        }
+    }
+}
+
+/*
+ * Exclude non overlapping frames.
+ * Returns 1 if it overlaps, -1 if not.
+ */
+int
+__cross_overlaps(setstruct *set_a, 
+                setstruct *set_b,
+                int        lng, 
+                int        lat, 
+                int        naxis,
+                double     *lngmax)
+{
+    int i;
+
+    if (lng != lat) {
+
+        if ( set1->projposmin[lng] > (*lngmax=set2->projposmax[lng] + rlimit) ||
+            (lngmin2=set2->projposmin[lng] - rlimit) > set1->projposmax[lng]  ||
+             set1->projposmin[lat] > (latmax2=set2->projposmax[lat] + rlimit) ||
+            (latmin2=set2->projposmin[lat] - rlimit)> set1->projposmax[lat]) {
+            return -1;
+        }
+
+    } else {
+
+        for (i=0; i<naxis; i++) {
+            if ( set1->projposmin[i] > (projmax2[i]=set2->projposmax[i]+rlimit) ||
+                (projmin2[i]=set2->projposmin[i]-rlimit)> set1->projposmax[i]) 
+            {   
+                return -1;
+            }   
+        }   
+    }
+
+    return 1;
+}
+
+/*
+ * Crossid algorythm.
+ */
+void
+__cross_set(setstruct *set_a, 
+            setstruct *set_b,
+            wcsstruct *wcs,
+            double     limit,
+            int        naxis,
+            int        lng,
+            int        lat)
+{
+    double lngmax = 0.0;
+    if (__cross_overlaps(set_a, set_b, lng, lat, naxis, &lngmax) < 0)
+        return;
+    
+    // STOP HERE, restart at "for(nsamp-set1->nsample;nsam--;samp1++..."
+}
+
+/*
+ * Loop over fields and apply crossid algorythm
+ */
+void
+__loop_crossid(fgroupstruct *fgroup, double limit)
+{
+    int i, j, k, l;
+
+    struct set *set_a;
+    struct set *set_b;
+
+    fieldstruct **fields = fgroup->field;
+    wcsstruct    *wcs    = fgroup->wcs;
+    int naxis            = fgroup->naxis;
+    int lng              = fgroup->lng;
+    int lat              = fgroup->lat;
+
+    /*
+     * With this, we are crossing every sets together once.
+     * Can this be parallelized?
+     */
+    for (i=0; i < fgroup->nfield; i++) {
+        for (j=0; j < fields[i]->nset; j++) {
+            for (k=0; k < i; k++) {
+                for (l=0; l < fields[k]->nset; l++) {
+
+                    set_a = fields[i]->set[j];
+                    set_b = fields[k]->set[l];
+
+                    __cross_set(set_a, set_b, wcs, limit, naxis, lng, lat);
+
+                }
+            }
+        }
+    }
+}
+
+
+/**
+ * @fn void crossid_fgroup(fgroupstruct *fgroup, fieldstruct *reffield, double tolerance)
+ * @brief Perform source cross-identifications in a group of fields.
+ * @param fgroup ptr to the group of fields,
+ * @param reffield ptr to the reference field,
+ * @param tolerance Tolerance (in deg. if angular coordinates).
+ * @remarks Uses the global preferences.
+ * @author E. Bertin (IAP)
+ * @version 13/09/2012
+ */
+void crossid_fgroup(fgroupstruct *fgroup, 
+                    fieldstruct  *reffield,
+                    double        tolerance)
+{
     fieldstruct **field, *field1, *field2;
     wcsstruct *wcs;
     setstruct **pset1,**pset2, **pset,
@@ -72,14 +206,14 @@ void crossid_fgroup(
                  *prevsamp2, *nextsamp1, *nextsamp2;
     double projmin2[NAXIS], projmax2[NAXIS], *proj1,
            lng1,lat1, latmin1, latmax1, lngmin2, lngmax2, latmin2, latmax2,
-           dlng, dlat, dx, rlim, rlimmin, r2, r2n, r2p, r2min;
+           dlng, dlat, dx, rlimit, r2, r2n, r2p, r2min;
     float fmax;
     int i, f, f1, f2, s1, s2, nset1, nset2, nsamp, nsamp2, nsamp2b,
-         s, nfield, naxis, lng,lat, yaxis;
+        s, nfield, naxis, lng,lat, yaxis;
 
     lng1 = lngmin2 = lngmax2 = latmin2 = latmax2 = 0.0;
-    field1  = NULL; /* to avoid gcc -Wall warnings */
-    proj1   = NULL;  /* to avoid gcc -Wall warnings */
+    field1 = NULL; /* to avoid gcc -Wall warnings */
+    proj1  = NULL; /* to avoid gcc -Wall warnings */
     field   = fgroup->field;
     nfield  = fgroup->nfield;
     naxis   = fgroup->naxis;
@@ -87,31 +221,15 @@ void crossid_fgroup(
     lat     = fgroup->lat;
     wcs     = fgroup->wcs;
 
-    /* Compute the largest possible error in pixels allowed in previous matching */
-    rlimmin = 0.0;
-    for (i=0; i<naxis; i++) {
-        if ((rlim=tolerance/fgroup->meanwcsscale[i])>rlimmin)
-            rlimmin = rlim;
-    }
 
-    rlim = rlimmin;
-
-    /* Sort samples to accelerate further processing and reset pointers */
-    for (f=0; f<nfield; f++)
-    {
-        pset = field[f]->set;
-        set  = *(pset++);
-        field[f]->prevfield = field[f]->nextfield = NULL;
-        for (s=field[f]->nset; s--; set=*(pset++))
-        {
-            sort_samples(set);
-            unlink_samples(set);
-        }
-    }
+    rlimit = __get_limit(fgroup, tolerance);
+    __sort_samples(fgroup);
 
     /*
      * Now start the real cross-id loop 
      */
+
+    __loop_crossid(fgroup, rlimit);
 
     /* Foreach fealds */
     for (f1=1; f1<nfield; f1++)
@@ -140,10 +258,10 @@ void crossid_fgroup(
                     if (lng != lat)
                     {
                         if (
-                            set1->projposmin[lng] > (lngmax2=set2->projposmax[lng] + rlim) ||
-                            (lngmin2=set2->projposmin[lng] - rlim) > set1->projposmax[lng] ||
-                            set1->projposmin[lat] > (latmax2=set2->projposmax[lat] + rlim) ||
-                            (latmin2=set2->projposmin[lat] - rlim)> set1->projposmax[lat]) 
+                                set1->projposmin[lng] > (lngmax2=set2->projposmax[lng] + rlimit) ||
+                                (lngmin2=set2->projposmin[lng] - rlimit) > set1->projposmax[lng] ||
+                                set1->projposmin[lat] > (latmax2=set2->projposmax[lat] + rlimit) ||
+                                (latmin2=set2->projposmin[lat] - rlimit)> set1->projposmax[lat]) 
                         {
                             continue;
                         }
@@ -152,8 +270,8 @@ void crossid_fgroup(
                     {
                         for (i=0; i<naxis; i++) {
                             if (
-                                set1->projposmin[i] > (projmax2[i]=set2->projposmax[i]+rlim) ||
-                                (projmin2[i]=set2->projposmin[i]-rlim)> set1->projposmax[i]) 
+                                    set1->projposmin[i] > (projmax2[i]=set2->projposmax[i]+rlimit) ||
+                                    (projmin2[i]=set2->projposmin[i]-rlimit)> set1->projposmax[i]) 
                             {
                                 continue;
                             }
@@ -185,9 +303,9 @@ void crossid_fgroup(
                             lat1 = (naxis<2) ? proj1[yaxis=0] : proj1[yaxis=1];
                         }
 
-                        latmin1  = lat1-rlim;
-                        latmax1  = lat1+rlim;
-                        r2min    = rlim*rlim;
+                        latmin1  = lat1-rlimit;
+                        latmax1  = lat1+rlimit;
+                        r2min    = rlimit*rlimit;
                         samp2min = NULL;
                         samp2    = samp2b;
                         /*---------- Jump over sources that can't match in y */
@@ -304,18 +422,18 @@ void crossid_fgroup(
                 /*---------- Exclude non-overlapping frames */
                 if (lng != lat)
                 {
-                    if (set1->projposmin[lng] > (lngmax2=set2->projposmax[lng]+rlim)
-                            || (lngmin2=set2->projposmin[lng]-rlim) > set1->projposmax[lng]
-                            || set1->projposmin[lat] > (latmax2=set2->projposmax[lat]+rlim)
-                            || (latmin2=set2->projposmin[lat]-rlim)> set1->projposmax[lat])
+                    if (set1->projposmin[lng] > (lngmax2=set2->projposmax[lng]+rlimit)
+                            || (lngmin2=set2->projposmin[lng]-rlimit) > set1->projposmax[lng]
+                            || set1->projposmin[lat] > (latmax2=set2->projposmax[lat]+rlimit)
+                            || (latmin2=set2->projposmin[lat]-rlimit)> set1->projposmax[lat])
                         continue;
                 }
                 else
                 {
                     for (i=0; i<naxis; i++)
                     {
-                        if (set1->projposmin[i] > (projmax2[i]=set2->projposmax[i]+rlim)
-                                || (projmin2[i]=set2->projposmin[i]-rlim) >set1->projposmax[i])
+                        if (set1->projposmin[i] > (projmax2[i]=set2->projposmax[i]+rlimit)
+                                || (projmin2[i]=set2->projposmin[i]-rlimit) >set1->projposmax[i])
                             continue;
                     }
                 }
@@ -341,9 +459,9 @@ void crossid_fgroup(
                                 continue;
                         lat1 = (naxis<2) ? proj1[yaxis=0] : proj1[yaxis=1];
                     }
-                    latmin1  = lat1-rlim;
-                    latmax1  = lat1+rlim;
-                    r2min    = rlim*rlim;
+                    latmin1  = lat1-rlimit;
+                    latmax1  = lat1+rlimit;
+                    r2min    = rlimit*rlimit;
                     fmax     = 0.0;
                     samp2min = NULL;
                     samp2    = samp2b;
@@ -418,17 +536,17 @@ void crossid_fgroup(
 }
 
 
-/****** recenter_fgroup *******************************************************
-  PROTO void recenter_fgroup(fgroupstruct *fgroup, fieldstruct *reffield)
-  PURPOSE Perform field recentering with respect to a reference catalog in a
-  group of fields.
-  INPUT ptr to the group of fields,
-  ptr to the reference field.
-  OUTPUT -.
-  NOTES Uses the global preferences.
-  AUTHOR E. Bertin (IAP)
-  VERSION 09/06/2011
- ***/
+/**
+ * @fn void recenter_fgroup(fgroupstruct *fgroup, fieldstruct *reffield)
+ * @brief Perform field recentering with respect to a reference catalog in a
+ *  group of fields.
+ * @param fgroup ptr to the group of fields,
+ * @param reffield ptr to the reference field.
+ * @returns void
+ * @remarks Uses the global preferences.
+ * @author E. Bertin (IAP)
+ * @version 09/06/2011
+ */
 void recenter_fgroup(fgroupstruct *fgroup, fieldstruct *reffield)
 {
     fieldstruct *field;
@@ -495,16 +613,16 @@ void recenter_fgroup(fgroupstruct *fgroup, fieldstruct *reffield)
 }
 
 
-/****** check_fieldoverlap ****************************************************
-  PROTO int check_fieldoverlap(fieldstruct *field1, fieldstruct *field2)
-  PURPOSE Check if two fields overlap or not.
-  INPUT ptr to the first field,
-  ptr to the second field.
-  OUTPUT 1 if they overlap, 0 otherwise.
-  NOTES -.
-  AUTHOR E. Bertin (IAP)
-  VERSION 07/02/2005
- ***/
+/**
+ * @fn int check_fieldoverlap(fieldstruct *field1, fieldstruct *field2)
+ * @brief Check if two fields overlap or not.
+ * @param field1 ptr to the first field,
+ * @param field2 ptr to the second field.
+ * @return integer 1 if they overlap, 0 otherwise.
+ * @remarks
+ * @author E. Bertin (IAP)
+ * @version 07/02/2005
+ */
 int check_fieldoverlap(fieldstruct *field1, fieldstruct *field2)
 
 {
@@ -544,19 +662,18 @@ int check_fieldoverlap(fieldstruct *field1, fieldstruct *field2)
 }
 
 
-/****** check_fieldphotomoverlap **********************************************
-  PROTO int check_fieldphotomoverlap(fieldstruct *field, int instru)
-  PURPOSE Check if a field overlaps a photometric field or not.
-  INPUT ptr to the field to check,
-  photometric instrument index.
-  OUTPUT Photometric code (1 for genuine, 2 for dummy) if it overlaps, 0
-  otherwise.
-  NOTES -.
-  AUTHOR E. Bertin (IAP)
-  VERSION 25/02/2005
- ***/
+/**
+ * @fn int check_fieldphotomoverlap(fieldstruct *field, int instru)
+ * @brief Check if a field overlaps a photometric field or not.
+ * @param field ptr to the field to check,
+ * @param instru photometric instrument index.
+ * @returns Photometric code (1 for genuine, 2 for dummy) if it overlaps, 0
+ * otherwise.
+ * @remarks
+ * @author E. Bertin (IAP)
+ * @version 25/02/2005
+ */
 int check_fieldphotomoverlap(fieldstruct *field, int instru)
-
 {
     setstruct **pset,
               *set;
@@ -594,4 +711,5 @@ int check_fieldphotomoverlap(fieldstruct *field, int instru)
     /* No photometric field found */
     return 0;
 }
+
 

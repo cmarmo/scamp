@@ -3,8 +3,6 @@
  *
  * Include file for crossid.c
  *
- *%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
- *
  * This file part of: SCAMP
  *
  * Copyright:  (C) 2002-2010 Emmanuel Bertin -- IAP/CNRS/UPMC
@@ -24,29 +22,18 @@
  *
  * Last modified:  10/10/2010
  *
- *%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
-
+ */
 #ifndef _CROSSID_H_
 #define _CROSSID_H_
 
 #include "fgroup.h"
 
-/*---------------------------- Internal constants ---------------------------*/
-
-/*--------------------------------- typedefs --------------------------------*/
-/*------------------------------- functions ---------------------------------*/
-
-extern int check_fieldoverlap(
-    fieldstruct *field1, 
-    fieldstruct *field2);
-
-extern int check_fieldphotomoverlap(
-    fieldstruct *field, 
-    int instru);
-
-extern void crossid_fgroup(
-    fgroupstruct *fgroup,
-    fieldstruct *reffield, 
-    double tolerance);
+extern int check_fieldoverlap(fieldstruct *field1, 
+                              fieldstruct *field2);
+extern int check_fieldphotomoverlap(fieldstruct *field, 
+                                    int instru);
+extern void crossid_fgroup(fgroupstruct *fgroup,
+                           fieldstruct *reffield, 
+                           double tolerance);
 
 #endif // _CROSSID_H_
