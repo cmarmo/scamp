@@ -103,7 +103,60 @@ __sort_samples(fgroupstruct *fgroup)
 }
 
 int
+__cross_sample_s1(double *lng1, 
+                  double *lat1, 
+                  double *yaxis, 
+                  int   lng,
+                  int     lat,
+                  samplestruct *samp1)
+{
+
+    if (lat!=lng)
+    {
+        *lng1  = samp1->projpos[lng];
+        *lat1  = samp1->projpos[lat];
+        *yaxis = lat;
+        /*------------ Jump over sources in the non-overlapping region */
+        if (*lat1<latmin2 || *lat1>latmax2 || *lng1<lngmin2 || *lng1>lngmax2)
+            return -1;
+    }
+    else
+    {
+        proj1 = samp1->projpos;
+        for (i=0; i<naxis; i++) {
+            if (proj1[i] < projmin2[i] || proj1[i]>projmax2[i])
+                return -1;
+        }
+        *lat1 = (naxis<2) ? proj1[*yaxis=0] : proj1[*yaxis=1];
+    }
+}
+
+int
 __cross_samples(setstruct   *set_a, 
+                setstruct   *set_b,
+                int         lng, 
+                int         lat, 
+                int         naxis,
+                double      limit,
+                CrossState *state)
+{
+    int status;
+    double lng1;
+    double lat1;
+    double yaxis;
+
+    for (i=0; i < set_a->nsample; i++) {
+
+        status = __cross_sample_s1(&lng1, &lat1, &yaxis, lng, lat,
+                                   set_a->sample[i]);
+
+    }
+
+}
+
+
+int
+__cross_samples_loop(setstruct   *set_a, 
                 setstruct   *set_b,
                 int         lng, 
                 int         lat, 
@@ -160,9 +213,6 @@ __cross_samples(setstruct   *set_a,
                     break;
                 }
             }
-
-            
-            
         }
     }
 }
@@ -272,7 +322,7 @@ __cross_set(setstruct *set_a,
     if (status < 0)
         return;
     
-    status = __cross_samples(set_a, set_b, lng, lat, naxis, limit, &state);
+    status = __cross_samples_loop(set_a, set_b, lng, lat, naxis, limit, &state);
     if (status < 0)
         return;
 
