@@ -22,13 +22,13 @@
 #	You should have received a copy of the GNU General Public License
 #	along with SCAMP. If not, see <http://www.gnu.org/licenses/>.
 #
-#	Last modified:		16/06/2017
+#	Last modified:		27/12/2017
 #
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 ACLOCAL_AMFLAGS		= -I m4
 AUTOMAKE_OPTIONS	= foreign no-dependencies
-SUBDIRS			= src man doc debian
+SUBDIRS			= src tests man doc debian
 dist_pkgdata_DATA	= config/*.ahead xsl/scamp.xsl
 EXTRA_DIST		= autogen.sh AUTHORS BUGS ChangeLog COPYRIGHT \
 			  HISTORY INSTALL LICENSE README.md THANKS
@@ -55,11 +55,11 @@ deb:	dist
 	mkdir -p $(DEB_SRCDIR)
 	tar -xvf $(PACKAGE_TARNAME)-$(PACKAGE_VERSION).tar.gz -C $(DEB_SRCDIR) 
 	cd $(DEB_SRCDIR)/$(PACKAGE_TARNAME)-$(PACKAGE_VERSION)
-	debuild -j4 -b -us -uc
+	debuild --set-envvar=PACKAGE_RELEASE=$(PACKAGE_RELEASE) -j4 -b -us -uc
 
 deb-best:	dist
 	mkdir -p $(DEB_SRCDIR)
 	tar -xvf $(PACKAGE_TARNAME)-$(PACKAGE_VERSION).tar.gz -C $(DEB_SRCDIR) 
 	cd $(DEB_SRCDIR)/$(PACKAGE_TARNAME)-$(PACKAGE_VERSION)
-	debuild --set-envvar=USE_BEST=1 --preserve-env --preserve-envvar=PATH -j4 -b -us -uc
+	debuild  --set-envvar=PACKAGE_RELEASE=$(PACKAGE_RELEASE) --set-envvar=USE_BEST=1 --preserve-env --preserve-envvar=PATH -j4 -b -us -uc
 
