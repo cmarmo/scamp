@@ -7,7 +7,7 @@
 #
 #	This file part of:	SCAMP
 #
-#	Copyright:		(C) 2002-2017 IAP/CNRS/UPMC
+#	Copyright:		(C) 2002-2019 IAP/CNRS/SorbonneU
 #
 #	License:		GNU General Public License
 #
@@ -22,7 +22,7 @@
 #	You should have received a copy of the GNU General Public License
 #	along with SCAMP.  If not, see <http://www.gnu.org/licenses/>.
 #
-#	Last modified:		27/12/2017
+#	Last modified:		29/03/2019
 #
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -31,7 +31,7 @@ define([AC_CACHE_LOAD],)
 define([AC_CACHE_SAVE],)
 
 # This is your standard AstrOmatic source code...
-AC_INIT(SCAMP, 2.6.3, [astromatic@astromatic.net],
+AC_INIT(SCAMP, 2.7.8, [astromatic@astromatic.net],
 	scamp, [http://astromatic.net/software/scamp])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_AUX_DIR(autoconf)
@@ -262,7 +262,7 @@ AM_CONDITIONAL(USE_THREADS, test $use_pthreads = "yes")
 
 ############ handle the INTEL MKL library (FFTW + LAPACKe) ###########
 if test "$enable_mkl" = "yes"; then
-  convlibs="${srcdir}/wcs/libwcs_c.a"
+  convlibs="${srcdir}/../src/wcs/libwcs_c.a"
   ACX_MKL($with_mkl_dir,yes,$enable_best_link,$convlibs)
   AC_MSG_CHECKING([for the INTEL MKL])
   if test "$MKL_WARN" == ""; then

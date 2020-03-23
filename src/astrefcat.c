@@ -7,7 +7,7 @@
 *
 *	This file part of:	SCAMP
 *
-*	Copyright:		(C) 2002-2016 IAP/CNRS/UPMC
+*	Copyright:		(C) 2002-2018 IAP/CNRS/UPMC
 *
 *	License:		GNU General Public License
 *
@@ -22,7 +22,7 @@
 *	You should have received a copy of the GNU General Public License
 *	along with SCAMP. If not, see <http://www.gnu.org/licenses/>.
 *
-*	Last modified:		14/09/2016
+*	Last modified:		02/05/2018
 *
 *%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
@@ -115,7 +115,14 @@ astrefstruct	astrefcats[] =
 	{"f.mag", ""}, {"R", ""},
 	1, 0},
 
-  {"SDSS-R9", "V/139", {"mode","Q","RAJ2000","DEJ2000","e_RAJ2000","e_DEJ2000",
+  {"SDSS-R9", "V/139", {"mode","Q","RA_ICRS","DE_ICRS","e_RA_ICRS","e_DE_ICRS",
+		"ObsDate", "umag","e_umag","gmag","e_gmag","rmag","e_rmag",
+		"imag","e_imag","zmag","e_zmag",""},
+	{"umag", "gmag", "rmag", "imag", "zmag", ""},
+	{"u", "g", "r", "i", "z", ""},
+	5, 2},
+
+  {"SDSS-R12", "V/147", {"mode","Q","RA_ICRS","DE_ICRS","e_RA_ICRS","e_DE_ICRS",
 		"ObsDate", "umag","e_umag","gmag","e_gmag","rmag","e_rmag",
 		"imag","e_imag","zmag","e_zmag",""},
 	{"umag", "gmag", "rmag", "imag", "zmag", ""},
@@ -165,12 +172,26 @@ astrefstruct	astrefcats[] =
 	{"J", "H", "Ks", "W1", "W2", "W3", "W4", ""}, 
 	7, 3},
 
-  {"GAIA-DR1", "I/337", {"Dup", "RA_ICRS","DE_ICRS","e_RA_ICRS","e_DE_ICRS",
+  {"GAIA-DR1", "I/337/gaia", {"Dup", "RA_ICRS","DE_ICRS","e_RA_ICRS","e_DE_ICRS",
 		"Epoch","pmRA","pmDE","e_pmRA","e_pmDE",
 		"<FG>","e_<FG>","<Gmag>",""},
 	{"<Gmag>", ""},
 	{"G", ""},
 	1, 0},
+
+  {"GAIA-DR2", "I/345/gaia2", {"Dup", "RA_ICRS","DE_ICRS","e_RA_ICRS","e_DE_ICRS",
+		"Epoch","pmRA","pmDE","e_pmRA","e_pmDE",
+		"Gmag","e_Gmag","BPmag","e_BPmag","RPmag","e_RPmag",""},
+	{"Gmag", "BPmag","RPmag",""},
+	{"G", "BP", "RP", ""},
+	3, 0},
+
+  {"PANSTARRS-1", "II/349", {"Qual", "RAJ2000","DEJ2000","e_RAJ2000","e_DEJ2000",
+		"Epoch", "gmag","e_gmag","rmag","e_rmag","imag","e_imag",
+		"zmag","e_zmag","ymag","e_ymag",""},
+	{"umag", "gmag", "rmag", "imag", "zmag", ""},
+	{"g", "r", "i", "z", "y", ""},
+	5, 2},
 
   {""}
  };
@@ -198,7 +219,7 @@ INPUT   Catalog name,
 OUTPUT  Pointer to the reference field.
 NOTES   Global preferences are used.
 AUTHOR  E. Bertin (IAP)
-VERSION	14/09/2016
+VERSION	02/05/2018
 */
 fieldstruct	*get_astreffield(astrefenum refcat, double *wcspos,
 				int lng, int lat, int naxis, double maxradius)
@@ -288,6 +309,7 @@ fieldstruct	*get_astreffield(astrefenum refcat, double *wcspos,
     if (!field)
         error(EXIT_FAILURE,"*Error*: No appropriate FITS-LDAC astrometric ",
 			"reference catalog found");
+    field->isrefcat = 1;
     return field;
     }
 
@@ -302,7 +324,7 @@ fieldstruct	*get_astreffield(astrefenum refcat, double *wcspos,
   for (s=0; s<prefs.nref_server; s++) {
     colname = astrefcat->viziercolumns[0];
     sprintf(url,
-	"http://%s/viz-bin/asu-tsv?&-mime=csv&-source=%s&-out.max=10000000"
+	"http://%s/viz-bin/asu-tsv?&-mime=csv&-source=%s&-out.max=100000000"
 	"&-out.meta=&%s-c=%.7f,%s%.7f&-c.rd=%.8g&-out=%s",
 	prefs.ref_server[s],
 	astrefcat->viziername,
@@ -562,6 +584,23 @@ fieldstruct	*get_astreffield(astrefenum refcat, double *wcspos,
           }
           break;
 
+        case ASTREFCAT_SDSSR12:
+/*-------- Avoid missing or poor observations, and secondary detections */
+          mode = atoi(cols[cindex++]);
+          qual = atoi(cols[cindex++]);
+          if (mode==2 || qual<2 || qual>3)
+            continue;
+          alpha = atof(cols[cindex++]);
+          delta = atof(cols[cindex++]);
+          poserr[lng] = atof(cols[cindex++])*ARCSEC/DEG;
+          poserr[lat] = atof(cols[cindex++])*ARCSEC/DEG;
+          epoch = atof(cols[cindex++]);
+          for (b=0; b<nband; b++) {
+            mag[b] = atof(cols[cindex++]);
+            magerr[b] = atof(cols[cindex++]);
+          }
+          break;
+
         case ASTREFCAT_NOMAD1:
           alpha = atof(cols[cindex++]);
           delta = atof(cols[cindex++]);
@@ -754,6 +793,65 @@ fieldstruct	*get_astreffield(astrefenum refcat, double *wcspos,
             magerr[0] = 1.0857 * fluxerr / flux;
           break;
 
+        case ASTREFCAT_GAIADR2:
+/*-------- Reject duplicated sources */
+          sflag = cols[cindex++];
+/*
+          if (sflag[0]!='0')
+            continue;
+*/
+          alpha = atof(cols[cindex++]);
+          delta = atof(cols[cindex++]);
+          poserr[lng] = atof(cols[cindex++])*MAS/DEG;
+          poserr[lat] = atof(cols[cindex++])*MAS/DEG;
+          epoch = atof(cols[cindex++]);
+          sprop[lng] = cols[cindex++];
+          sprop[lat] = cols[cindex++];
+          sproperr[lng] = cols[cindex++];
+          sproperr[lat] = cols[cindex++];
+          if (sprop[lng][4]<= ' ' || sprop[lat][4]<= ' ') {
+            prop[lng] = prop[lat] = properr[lng] = properr[lat] = 0.0;
+          } else {
+            prop[lng] = atof(sprop[lng])*MAS/DEG;
+            prop[lat] = atof(sprop[lat])*MAS/DEG;
+            properr[lng] = (sproperr[lng][1]==' '?
+				1000.0 : atof(sproperr[lng])) * MAS/DEG;
+            properr[lat] = (sproperr[lat][1]==' '?
+				1000.0 : atof(sproperr[lat])) * MAS/DEG;
+          }
+          for (b=0; b<nband; b++) {
+            smag = cols[cindex++];
+            smagerr = cols[cindex++];
+            if (smag[4] <= ' ' || smagerr[4] <= ' ') {
+              mag[b] = magerr[b] = 99.0;
+}
+            else {
+              mag[b] = atof(smag);
+              magerr[b] = atof(smagerr);
+            }
+          }
+          break;
+
+        case ASTREFCAT_PANSTARRS1:
+          if (atoi(cols[cindex++]) & 4 == 0)	// Test PS1 reliability
+            continue;
+          alpha = atof(cols[cindex++]);
+          delta = atof(cols[cindex++]);
+          poserr[lng] = atof(cols[cindex++])*ARCSEC/DEG;
+          poserr[lat] = atof(cols[cindex++])*ARCSEC/DEG;
+          epoch = 2000.0 + (atof(cols[cindex++]) - (JD2000 - 2400000.5))/365.25;
+          for (b=0; b<nband; b++) {
+            smag = cols[cindex++];
+            smagerr = cols[cindex++];
+            if (smag[2] <= ' ')
+              mag[b] = magerr[b] = 99.0;
+            else {
+              mag[b] = atof(smag);
+              magerr[b] = smagerr[2] <= ' '? atof(smagerr): DEFAULT_MAGERR;
+            }
+          }
+          break;
+
         case ASTREFCAT_NONE:
         default:
           break;
@@ -851,6 +949,7 @@ epoch, sample->mag, sample->magerr);
   field->set[0] = set;
   field->nset = 1;
 /* This is a reference catalog */
+  field->isrefcat = 1;
   field->astromlabel = field->photomlabel = -1;
   set->lng = field->lng = lng;
   set->lat = field->lat = lat;
@@ -1089,6 +1188,7 @@ fieldstruct	*load_astreffield(char *filename, double *wcspos,
 
 /* This is a reference catalog */
   field->astromlabel = field->photomlabel = -1;
+  field->epoch = -1.0;
   field->set[0] = set;
   field->nset = 1;
   set->lng = field->lng = lng;
@@ -1376,20 +1476,20 @@ INPUT	Input Vizier string,
 OUTPUT  -.
 NOTES   -.
 AUTHOR  E. Bertin (IAP)
-VERSION 05/04/2016
+VERSION 19/02/2018
 */
 static void	vizier_to_array(char *str, char (*cols)[COLUMN_SIZE])
 
   {
    char		*col;
 
-  while (*str) {
-    col = *(cols++);
-    while (*str && *str != ';')
-      *(col++) = *(str++); 
-    *col = '\0';
-    str++;
-  }
+  if (*str)
+    do {
+      col = *(cols++);
+      while (*str && *str != ';')
+        *(col++) = *(str++); 
+      *col = '\0';
+    } while (*(str++));
 
   return;
   }

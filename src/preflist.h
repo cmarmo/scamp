@@ -7,7 +7,7 @@
 *
 *	This file part of:	SCAMP
 *
-*	Copyright:		(C) 2002-2017 IAP/CNRS/UPMC
+*	Copyright:		(C) 2002-2018 IAP/CNRS/SorbonneU
 *
 *	License:		GNU General Public License
 *
@@ -22,7 +22,7 @@
 *	You should have received a copy of the GNU General Public License
 *	along with SCAMP. If not, see <http://www.gnu.org/licenses/>.
 *
-*	Last modified:		18/07/2017
+*	Last modified:		29/08/2018
 *
 *%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 
@@ -66,8 +66,8 @@ pkeystruct key[] =
   {"ASTREF_BAND", P_STRING, prefs.astref_bandname},
   {"ASTREF_CATALOG", P_KEY, &prefs.astrefcat, 0,0, 0.0,0.0,
    {"NONE", "FILE", "USNO-A2", "USNO-B1", "GSC-2.3", "2MASS", "DENIS-3",
-    "UCAC-4", "URAT-1", "SDSS-R9", "NOMAD-1", "PPMX", "CMC-15", "TYCHO-2",
-    "IGSL", "ALLWISE", "GAIA-DR1", ""}},
+    "UCAC-4", "URAT-1", "SDSS-R9", "SDSS-R12", "NOMAD-1", "PPMX", "CMC-15",
+    "TYCHO-2", "IGSL", "ALLWISE", "GAIA-DR1", "GAIA-DR2", "PANSTARRS-1", ""}},
   {"ASTREF_WEIGHT", P_FLOAT, &prefs.astref_weight, 0,0, 1e-6,1e6},
   {"ASTREFCAT_NAME", P_STRINGLIST, prefs.astref_name, 0,0,0.0,0.0,
     {""}, 0, MAXNGROUP, &prefs.nastref_name},
@@ -214,20 +214,21 @@ char *default_prefs[] =
 " ",
 "#---------------------------- Reference catalogs ------------------------------",
 " ",
-"REF_SERVER         vizier.u-strasbg.fr # Internet addresses of catalog servers",
+"REF_SERVER         vizier.unistra.fr   # Internet addresses of catalog servers",
 "                                       # Possible mirrors include:",
 "                                       # vizier.nao.ac.jp,",
 "                                       # vizier.hia.nrc.ca,",
 "                                       # vizier.ast.cam.ac.uk,",
-"                                       # vizier.iucaa.ernet.in,",
+"                                       # vizier.iucaa.in,",
 "                                       # vizier.china-vo.org,",
 "                                       # vizier.cfa.harvard.edu and",
 "                                       # viziersaao.chpc.ac.za",
 "*REF_TIMEOUT            10              # Server connection timeouts (s) 0=none",
 "ASTREF_CATALOG         2MASS           # NONE,FILE,USNO-A2,USNO-B1,GSC-2.3,",
 "                                       # TYCHO-2,UCAC-4,URAT-1,NOMAD-1,PPMX,",
-"                                       # CMC-15,2MASS,DENIS-3,SDSS-R9,IGSL,",
-"                                       # GAIA-DR1 or ALLWISE",
+"                                       # CMC-15,2MASS,DENIS-3,SDSS-R9,SDSS-R12,",
+"                                       # IGSL,GAIA-DR1,GAIA-DR2,PANSTARRS-1,",
+"                                       # or ALLWISE",
 "ASTREF_BAND            DEFAULT         # Photom. band for astr.ref.magnitudes",
 "                                       # or DEFAULT, BLUEST, or REDDEST",
 "*ASTREFCAT_NAME         astrefcat.cat   # Local astrometric reference catalogs",
